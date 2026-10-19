@@ -5662,4 +5662,73 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
 })();
 
 </script>
+<style id="tax-course-popup-scroll-fix">
+@media(max-width:900px){
+ html.tax-course-popup-lock{overflow:hidden!important;overscroll-behavior:none!important;scroll-behavior:auto!important}
+ body.tax-course-popup-lock{position:fixed!important;top:var(--tax-course-scroll-offset)!important;left:0!important;right:0!important;width:100%!important;overflow:hidden!important}
+ body.tax-course-popup-lock #gradeIntroModal,
+ body.tax-course-popup-lock #v307InfoModal,
+ body.tax-course-popup-lock #quizModal{position:fixed!important;inset:0!important;box-sizing:border-box!important;overflow:hidden!important;overscroll-behavior:none!important;touch-action:auto!important}
+ body.tax-course-popup-lock #gradeIntroModal .v108-intro-panel,
+ body.tax-course-popup-lock #v307InfoModal .v307-info-panel,
+ body.tax-course-popup-lock #quizModal .modalBox{box-sizing:border-box!important;max-height:calc(100vh - 48px)!important;max-height:calc(100dvh - 48px)!important;min-height:0!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important}
+}
+</style>
+<script id="tax-course-popup-scroll-controller">
+/* Isolate only the mobile grade-card flow, including its following dialogs. */
+(function(){
+ 'use strict';
+ var root=document.documentElement,body=document.body;
+ var ids=['gradeIntroModal','v307InfoModal','quizModal'];
+ var active=null,locked=false,x=0,y=0,touchY=null;
+ function mobile(){return matchMedia('(max-width:900px)').matches&&!body.classList.contains('v412-force-desktop');}
+ function panel(){return active&&active.querySelector('.v108-intro-panel,.v307-info-panel,.modalBox');}
+ function sync(){
+  var next=null;
+  if(mobile())ids.forEach(function(id,index){
+   var el=document.getElementById(id);
+   if(el&&el.classList.contains('show')&&(index<2||locked))next=el;
+  });
+  if(next){
+   if(!locked){
+    x=window.scrollX;y=window.scrollY;locked=true;
+    root.style.setProperty('--tax-course-scroll-offset',(-y)+'px');
+    root.classList.add('tax-course-popup-lock');body.classList.add('tax-course-popup-lock');
+   }
+   if(active!==next)touchY=null;
+   active=next;
+  }else if(locked){
+   locked=false;active=null;touchY=null;
+   body.classList.remove('tax-course-popup-lock');
+   root.style.removeProperty('--tax-course-scroll-offset');
+   window.scrollTo({left:x,top:y,behavior:'instant'});
+   root.classList.remove('tax-course-popup-lock');
+  }
+ }
+ // A single observer callback sees the final state of each synchronous transition.
+ var observer=new MutationObserver(sync);
+ ids.forEach(function(id){var el=document.getElementById(id);if(el)observer.observe(el,{attributes:true,attributeFilter:['class']});});
+ function canScroll(target,delta){
+  var p=panel();if(!p||!p.contains(target))return false;
+  var el=target.nodeType===1?target:target.parentElement;
+  while(el){
+   var overflow=getComputedStyle(el).overflowY;
+   if(/auto|scroll/.test(overflow)&&el.scrollHeight>el.clientHeight+1&&
+     ((delta<0&&el.scrollTop>0)||(delta>0&&el.scrollTop<el.scrollHeight-el.clientHeight-1)))return true;
+   if(el===p)break;el=el.parentElement;
+  }
+  return false;
+ }
+ document.addEventListener('touchstart',function(e){if(locked&&e.touches.length===1)touchY=e.touches[0].clientY;},{capture:true,passive:true});
+ document.addEventListener('touchmove',function(e){
+  if(!locked||e.touches.length!==1)return;
+  var now=e.touches[0].clientY,delta=touchY===null?0:touchY-now;touchY=now;
+  if(e.cancelable&&!canScroll(e.target,delta))e.preventDefault();
+ },{capture:true,passive:false});
+ document.addEventListener('wheel',function(e){if(locked&&e.cancelable&&!canScroll(e.target,e.deltaY))e.preventDefault();},{capture:true,passive:false});
+ window.addEventListener('resize',sync,{passive:true});
+ sync();
+})();
+</script>
+
 </body></html>
