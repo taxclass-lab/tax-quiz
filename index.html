@@ -1828,6 +1828,40 @@ body.v412-force-desktop #v412MobileReturn{
   var gesture=null;
   var suppressClickUntil=0;
   var suppressClickPage='';
+  // V515: soft rubber-band bounce only outside the first/last main tab.
+  var bouncePage=null;
+  var bounceCleanupTimer=null;
+  function finishBounce(){
+    if(!bouncePage)return;
+    var page=bouncePage;
+    bouncePage=null;
+    if(bounceCleanupTimer){clearTimeout(bounceCleanupTimer);bounceCleanupTimer=null;}
+    var reduceMotion=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    page.style.transition=reduceMotion?'none':'transform 340ms cubic-bezier(.20,.82,.25,1)';
+    page.style.transform='translate3d(0px, 0px, 0px)';
+    bounceCleanupTimer=window.setTimeout(function(){
+      // Only remove styles if another gesture has not begun on this page.
+      if(bouncePage!==page){
+        page.style.removeProperty('transition');
+        page.style.removeProperty('transform');
+      }
+      bounceCleanupTimer=null;
+    },reduceMotion?0:370);
+  }
+  function applyEdgeBounce(pageName,dx){
+    var i=order.indexOf(pageName);
+    if(!((i===0 && dx>0)||(i===order.length-1 && dx<0)))return false;
+    var page=document.getElementById(pageName);
+    if(!page || !page.classList.contains('active'))return false;
+    if(bounceCleanupTimer){clearTimeout(bounceCleanupTimer);bounceCleanupTimer=null;}
+    // High resistance and a fixed travel cap protect the mobile layout.
+    var amount=Math.min(49,49*(1-Math.exp(-Math.max(0,Math.abs(dx)-20)/100)));
+    var move=(dx>0?1:-1)*amount;
+    page.style.transition='none';
+    page.style.transform='translate3d('+move.toFixed(2)+'px, 0px, 0px)';
+    bouncePage=page;
+    return true;
+  }
   function mobile(){
     return window.matchMedia('(max-width:560px)').matches &&
            !document.body.classList.contains('v412-force-desktop');
@@ -1863,7 +1897,7 @@ body.v412-force-desktop #v412MobileReturn{
     // This is the only native horizontal card slider in the main page.
     return page.id==='learn' && !!target.closest('.v129-grade-card-row');
   }
-  function endTracking(){gesture=null;}
+  function endTracking(){finishBounce();gesture=null;}
   function activeIndex(){
     var page=document.querySelector('main > .page.active');
     return page ? order.indexOf(page.id) : -1;
@@ -1899,7 +1933,15 @@ body.v412-force-desktop #v412MobileReturn{
     if(Math.abs(dx)>20 && Math.abs(dx)>Math.abs(dy)*1.25){
       gesture.horizontal=true;
     }
-    if(gesture.horizontal && e.cancelable)e.preventDefault();
+    if(gesture.horizontal){
+      if(e.cancelable)e.preventDefault();
+      if(applyEdgeBounce(gesture.page,dx)){
+        gesture.bounced=true;
+      }else if(bouncePage){
+        // The finger has turned back toward a valid next menu.
+        finishBounce();
+      }
+    }
   },{passive:false,capture:true});
   document.addEventListener('touchend',function(e){
     var g=gesture;
@@ -1907,6 +1949,15 @@ body.v412-force-desktop #v412MobileReturn{
     if(!g || !mobile() || overlayOpen() || e.changedTouches.length!==1)return;
     if(g.page!==((document.querySelector('main > .page.active')||{}).id))return;
     var t=e.changedTouches[0],dx=t.clientX-g.x,dy=t.clientY-g.y;
+    // At the outer boundaries, release springs back without changing tabs.
+    var i=order.indexOf(g.page);
+    var outside=(i===0&&dx>0)||(i===order.length-1&&dx<0);
+    if(g.bounced && outside && Math.abs(dx)>20){
+      suppressClickUntil=Date.now()+650;
+      suppressClickPage=g.page;
+      if(e.cancelable)e.preventDefault();
+      return;
+    }
     if(Date.now()-g.at>1100 || Math.abs(dx)<55 ||
        Math.abs(dx)<Math.abs(dy)*1.3)return;
     // Cancel an accidental card/button/link click, but not ordinary taps.
@@ -1927,7 +1978,7 @@ body.v412-force-desktop #v412MobileReturn{
   },true);
 })();
 </script>
-<!-- V494 — 모바일 6개 메뉴: 홈 · 세금교실 · 학습자료 · 교육영상 · 학습효과 · 함께해요 -->
+<!-- V515 — 양끝 메뉴에서 고무줄처럼 돌아오는 탄성 슬라이드 / V494 — 모바일 6개 메뉴: 홈 · 세금교실 · 학습자료 · 교육영상 · 학습효과 · 함께해요 -->
 <div aria-hidden="true" class="v418-page-dots" id="v418PageDots">
 <span class="v418-dot"></span><span class="v418-dot"></span><span class="v418-dot"></span><span class="v418-dot"></span><span class="v418-dot"></span><span class="v418-dot"></span>
 </div>
@@ -5318,4 +5369,80 @@ body > .shell > nav button[data-page]:focus-visible{
   }
 }
 </style>
+
+<!-- V514: when a phone requests desktop layout (viewport width=1280), enlarge the return action to stay physically tappable. -->
+<style id="v514-return-fix">
+body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn{
+  display:flex!important;
+  box-sizing:border-box!important;
+  position:fixed!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:calc(22px * var(--v514-return-scale, 3))!important;
+  z-index:2147483000!important;
+  transform:translateX(-50%)!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:max-content!important;
+  max-width:90%!important;
+  min-height:calc(50px * var(--v514-return-scale, 3))!important;
+  padding:calc(12px * var(--v514-return-scale, 3)) calc(21px * var(--v514-return-scale, 3))!important;
+  border:calc(1px * var(--v514-return-scale, 3)) solid #0c599c!important;
+  border-radius:999px!important;
+  background:#176eb5!important;
+  color:#fff!important;
+  font-family:Pretendard,'Noto Sans KR','Malgun Gothic',sans-serif!important;
+  font-size:calc(14px * var(--v514-return-scale, 3))!important;
+  font-weight:800!important;
+  letter-spacing:-.025em!important;
+  line-height:1.25!important;
+  white-space:nowrap!important;
+  box-shadow:0 calc(5px * var(--v514-return-scale, 3)) calc(18px * var(--v514-return-scale, 3)) rgba(9,55,96,.28)!important;
+  cursor:pointer!important;
+  touch-action:manipulation!important;
+  -webkit-tap-highlight-color:transparent;
+}
+body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn::before{
+  content:"📱";
+  display:inline-block;
+  margin-right:calc(7px * var(--v514-return-scale, 3));
+  font-size:1.1em;
+  line-height:1;
+}
+body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
+  outline:calc(3px * var(--v514-return-scale, 3)) solid #ffdb70!important;
+  outline-offset:calc(3px * var(--v514-return-scale, 3))!important;
+}
+</style>
+<script id="v514-return-fix-script">
+(function(){
+  'use strict';
+  var oldViewSetter=window.v412SetView;
+  if(typeof oldViewSetter!=='function')return;
+  function adjust(){
+    var forced=document.body.classList.contains('v412-force-desktop');
+    var physicalWidth=window.screen.width||window.innerWidth||390;
+    var layoutWidth=window.innerWidth||document.documentElement.clientWidth||1280;
+    var touch=(window.matchMedia&&window.matchMedia('(pointer:coarse)').matches)||('ontouchstart' in window);
+    var onHandset=!!(forced&&touch&&(physicalWidth<=900||layoutWidth>physicalWidth*1.25));
+    document.body.classList.toggle('v514-touch-pc-mode',onHandset);
+    if(onHandset){
+      // Counter the reduced physical size of CSS pixels after width=1280 is applied.
+      var scale=Math.max(1.5,Math.min(4.5,layoutWidth/Math.max(260,physicalWidth)));
+      document.documentElement.style.setProperty('--v514-return-scale',scale.toFixed(3));
+    }else{
+      document.documentElement.style.removeProperty('--v514-return-scale');
+    }
+  }
+  window.v412SetView=function(mode){
+    oldViewSetter.apply(this,arguments);
+    adjust();
+    requestAnimationFrame(adjust);
+  };
+  window.addEventListener('resize',adjust,{passive:true});
+  window.addEventListener('orientationchange',function(){requestAnimationFrame(adjust);},{passive:true});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',adjust);
+  else adjust();
+})();
+</script>
 </body></html>
