@@ -1752,9 +1752,25 @@ function v402SkipLearningInfo(){
 }
 </style>
 <!-- V412 — 모바일 푸터 + PC/모바일 보기 전환 -->
-<footer aria-label="사이트 하단 정보" class="v412-mobile-footer" id="v412MobileFooter">
+<!-- V518 — 세금교실 담당자 교육문의 메일 연결 (기존 기능/화면 유지) -->
+<footer aria-label="사이트 하단 정보" class="v412-mobile-footer v518-contact-footer" id="v412MobileFooter">
 <div class="v412-footer-title">순천세무서 청소년 세금교실</div>
 <div class="v412-footer-copy">세금에 대해 쉽고 재미있게 배워보세요.</div>
+<div class="v518-contact" aria-label="세금교실 교육 문의 안내">
+  <div class="v518-contact-info">
+    <span class="v518-contact-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4.5 7 7.5 6 7.5-6"/></svg>
+    </span>
+    <div class="v518-contact-words">
+      <strong>교육 신청 · 운영 문의</strong>
+      <p>세금교실 교육 신청이나 운영에 대한 문의는 이메일로 보내주세요.</p>
+      <a class="v518-contact-address" href="mailto:ikh1234@nts.go.kr?subject=%5B%EC%88%9C%EC%B2%9C%EC%84%B8%EB%AC%B4%EC%84%9C%20%EC%84%B8%EA%B8%88%EA%B5%90%EC%8B%A4%5D%20%EA%B5%90%EC%9C%A1%20%EB%AC%B8%EC%9D%98" aria-label="순천세무서 세금교실 담당자 이메일로 문의하기">ikh1234@nts.go.kr</a>
+    </div>
+  </div>
+  <a class="v518-contact-button" href="mailto:ikh1234@nts.go.kr?subject=%5B%EC%88%9C%EC%B2%9C%EC%84%B8%EB%AC%B4%EC%84%9C%20%EC%84%B8%EA%B8%88%EA%B5%90%EC%8B%A4%5D%20%EA%B5%90%EC%9C%A1%20%EB%AC%B8%EC%9D%98" aria-label="세금교실 담당자에게 이메일 보내기">
+    <span>이메일 문의하기</span><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+  </a>
+</div>
 <button class="v412-view-switch" onclick="v412SetView('desktop')" type="button">PC 버전으로 보기</button>
 <div class="v412-footer-copyright">© 2026 순천세무서 · 청소년 세금교실</div>
 </footer>
@@ -1781,6 +1797,58 @@ body.v412-force-desktop #v412MobileReturn{
   display:block!important; position:fixed; right:18px; bottom:18px; z-index:99999;
   padding:10px 15px; border:1px solid #b9cbe0; border-radius:999px; background:#fff;
   box-shadow:0 5px 18px rgba(31,61,92,.16); color:#245b91; font-size:12px; font-weight:800; cursor:pointer;
+}
+</style>
+<style id="v518-education-email-footer-style">
+/* V518: PC와 모바일 공통 하단 문의 영역; 기존 상단 메뉴·콘텐츠·스와이프 비변경 */
+.v412-mobile-footer.v518-contact-footer {
+  display:block!important; box-sizing:border-box;
+  width:calc(100% - 32px);max-width:1100px;
+  margin:28px auto 25px;padding:20px 0 16px;
+  text-align:center;border-top:1px solid #e2eaf2;
+  font-family:Pretendard,'Noto Sans KR','Malgun Gothic',sans-serif;
+}
+.v518-contact-footer .v412-footer-title {font-size:14px;font-weight:800;color:#304a68;}
+.v518-contact-footer .v412-footer-copy {font-size:12px;margin-top:5px;color:#7e8b9e;}
+.v518-contact-footer .v412-footer-copyright {font-size:11px;margin-top:16px;color:#9aa8b6;}
+.v518-contact-footer .v412-view-switch{display:none;}
+.v518-contact{
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  box-sizing:border-box;text-align:left;margin:20px auto 0;padding:19px 22px;
+  border:1px solid #d8e7f7;border-radius:18px;
+  background:linear-gradient(112deg,#f6fbff 0%,#eff7ff 100%);
+}
+.v518-contact-info{display:flex;align-items:flex-start;gap:12px;min-width:0;}
+.v518-contact-icon{flex:0 0 42px;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:#e3f0ff;color:#217aca;}
+.v518-contact-words{min-width:0;}
+.v518-contact-words strong{display:block;color:#24466a;font-size:16px;line-height:1.45;font-weight:850;letter-spacing:-.35px;}
+.v518-contact-words p{margin:4px 0 6px;color:#607993;line-height:1.5;font-size:12px;word-break:keep-all;}
+.v518-contact-address{display:inline-block;color:#216fbd;font-size:12.5px;font-weight:700;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere;}
+.v518-contact-button{
+  flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  min-height:43px;padding:0 18px;border-radius:12px;border:1px solid #1f7cce;
+  background:#147ecb;color:white!important;text-decoration:none!important;
+  font-size:13px;font-weight:800;line-height:1.3;box-shadow:0 5px 12px rgba(21,117,201,.14);
+  cursor:pointer;touch-action:manipulation;white-space:nowrap;
+}
+.v518-contact-button:hover{background:#0b6cad;border-color:#0b6cad;}
+.v518-contact-button:focus-visible,.v518-contact-address:focus-visible{outline:3px solid #ffbd51;outline-offset:3px;}
+@media(max-width:560px){
+  .v412-mobile-footer.v518-contact-footer{
+    width:calc(100% - 24px);max-width:520px;
+    margin:16px auto 12px;padding:18px 3px 16px;
+    border-top:1px solid #e5ebf2;
+  }
+  .v518-contact{flex-direction:column;align-items:stretch;gap:13px;margin:15px auto 0;padding:14px 14px;border-radius:15px;}
+  .v518-contact-info{gap:10px;}
+  .v518-contact-icon{flex-basis:36px;width:36px;height:36px;border-radius:11px;}
+  .v518-contact-icon svg{width:20px;height:20px;}
+  .v518-contact-words strong{font-size:14px;}
+  .v518-contact-words p{font-size:11px;margin:3px 0 5px;}
+  .v518-contact-address{font-size:12px;}
+  .v518-contact-button{width:100%;box-sizing:border-box;min-height:43px;font-size:13px;}
+  .v518-contact-footer .v412-view-switch{display:inline-flex;align-items:center;justify-content:center;margin:13px 0 4px;}
+  .v518-contact-footer .v412-footer-copyright{margin-top:6px;font-size:10.5px;}
 }
 </style>
 <script id="v412-view-switch-script">
