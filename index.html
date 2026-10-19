@@ -1886,7 +1886,7 @@ body.v412-force-desktop #v412MobileReturn{
 }
 </style>
 <script id="v497-mobile-main-swipe">
-/* V497 — Mobile navigation swipe is available throughout all 6 main pages.
+/* V519 — Mobile navigation swipe works in all 6 main pages AND the shared footer.
    The 3 horizontally scrolling Learning Materials grade cards own their swipe.
    Leave other controls tappable; only suppress their click after a true swipe.
    Do not navigate while a dialog / quiz / modal / subview is displayed. */
@@ -1896,6 +1896,8 @@ body.v412-force-desktop #v412MobileReturn{
   var gesture=null;
   var suppressClickUntil=0;
   var suppressClickPage='';
+  // V519: prevent mailto / desktop-switch activation after a footer swipe.
+  var suppressClickFooter=false;
   // V515: soft rubber-band bounce only outside the first/last main tab.
   var bouncePage=null;
   var bounceCleanupTimer=null;
@@ -1916,13 +1918,15 @@ body.v412-force-desktop #v412MobileReturn{
       bounceCleanupTimer=null;
     },reduceMotion?0:370);
   }
-  function applyEdgeBounce(pageName,dx){
+  function applyEdgeBounce(pageName,dx,fromFooter){
     var i=order.indexOf(pageName);
     if(!((i===0 && dx>0)||(i===order.length-1 && dx<0)))return false;
-    var page=document.getElementById(pageName);
-    if(!page || !page.classList.contains('active'))return false;
+    var activePage=document.getElementById(pageName);
+    if(!activePage || !activePage.classList.contains('active'))return false;
+    // Footer lies outside <main>; bounce the touched surface, not an unrelated tab.
+    var page=fromFooter?document.getElementById('v412MobileFooter'):activePage;
+    if(!page)return false;
     if(bounceCleanupTimer){clearTimeout(bounceCleanupTimer);bounceCleanupTimer=null;}
-    // High resistance and a fixed travel cap protect the mobile layout.
     var amount=Math.min(49,49*(1-Math.exp(-Math.max(0,Math.abs(dx)-20)/100)));
     var move=(dx>0?1:-1)*amount;
     page.style.transition='none';
@@ -1959,7 +1963,16 @@ body.v412-force-desktop #v412MobileReturn{
   function pageAt(target){
     var el=target && (target.nodeType===1?target:target.parentElement);
     if(!el || !el.closest)return null;
-    return el.closest('main > .page.active');
+    var page=el.closest('main > .page.active');
+    // V519: website footer shares the currently active tab's swipe navigation.
+    if(!page && el.closest('#v412MobileFooter')){
+      page=document.querySelector('main > .page.active');
+    }
+    return page;
+  }
+  function fromFooter(target){
+    var el=target && (target.nodeType===1?target:target.parentElement);
+    return !!(el && el.closest && el.closest('#v412MobileFooter'));
   }
   function hasLocalSwipe(target,page){
     // This is the only native horizontal card slider in the main page.
@@ -1987,7 +2000,7 @@ body.v412-force-desktop #v412MobileReturn{
     // The user must be able to select and edit text without page switching.
     if(e.target.closest('input,textarea,select,[contenteditable="true"]'))return;
     var t=e.touches[0];
-    gesture={page:page.id,x:t.clientX,y:t.clientY,at:Date.now(),horizontal:false};
+    gesture={page:page.id,x:t.clientX,y:t.clientY,at:Date.now(),horizontal:false,fromFooter:fromFooter(e.target)};
   },{passive:true,capture:true});
   document.addEventListener('touchmove',function(e){
     if(!gesture)return;
@@ -2003,7 +2016,7 @@ body.v412-force-desktop #v412MobileReturn{
     }
     if(gesture.horizontal){
       if(e.cancelable)e.preventDefault();
-      if(applyEdgeBounce(gesture.page,dx)){
+      if(applyEdgeBounce(gesture.page,dx,gesture.fromFooter)){
         gesture.bounced=true;
       }else if(bouncePage){
         // The finger has turned back toward a valid next menu.
@@ -2023,6 +2036,7 @@ body.v412-force-desktop #v412MobileReturn{
     if(g.bounced && outside && Math.abs(dx)>20){
       suppressClickUntil=Date.now()+650;
       suppressClickPage=g.page;
+      suppressClickFooter=g.fromFooter;
       if(e.cancelable)e.preventDefault();
       return;
     }
@@ -2031,6 +2045,7 @@ body.v412-force-desktop #v412MobileReturn{
     // Cancel an accidental card/button/link click, but not ordinary taps.
     suppressClickUntil=Date.now()+650;
     suppressClickPage=g.page;
+      suppressClickFooter=g.fromFooter;
     if(e.cancelable)e.preventDefault();
     navigate(dx<0?1:-1);
   },{passive:false,capture:true});
@@ -2038,10 +2053,12 @@ body.v412-force-desktop #v412MobileReturn{
   document.addEventListener('click',function(e){
     if(Date.now()>suppressClickUntil)return;
     var page=pageAt(e.target);
-    if(page && page.id===suppressClickPage){
+    if((suppressClickFooter && fromFooter(e.target)) ||
+       (page && page.id===suppressClickPage)){
       e.preventDefault();
       e.stopImmediatePropagation();
       suppressClickUntil=0;
+      suppressClickFooter=false;
     }
   },true);
 })();
