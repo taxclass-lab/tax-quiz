@@ -5530,4 +5530,105 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
   else adjust();
 })();
 </script>
+
+<!-- V520: 학습자료 3개 학년 카드 공통 팝업: 배경 고정 + 팝업 내 세로 스크롤 -->
+<style id="v520-lesson-modal-scroll-style">
+  /* 저학년 / 고학년 / 중학생의 공통 학습자료 팝업에만 적용 */
+  html.v520-lesson-scroll-locked,
+  body.v520-lesson-scroll-locked {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+  #v340LearnModal.open {
+    position: fixed !important;
+    inset: 0 !important;
+    overflow: hidden !important;
+    overscroll-behavior: contain !important;
+  }
+  #v340LearnModal.open .v340LearnDialog {
+    box-sizing: border-box !important;
+    min-height: 0 !important;
+    max-height: calc(100vh - 24px) !important;
+    max-height: calc(100dvh - 24px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+  }
+  @media (max-width: 560px) {
+    /* Android/iOS에서 배경이 움직이는 현상까지 차단. 닫을 때 원위치 복원 */
+    body.v520-lesson-scroll-locked {
+      position: fixed !important;
+      top: var(--v520-lesson-body-top, 0px) !important;
+      left: 0 !important;
+      right: 0 !important;
+      width: 100% !important;
+    }
+  }
+</style>
+<script id="v520-lesson-modal-scroll-script">
+(function () {
+  'use strict';
+  var locked = false;
+  var savedY = 0;
+  var savedX = 0;
+  var rafQueued = false;
+  function lessonModal() { return document.getElementById('v340LearnModal'); }
+  function isOpen() {
+    var m = lessonModal();
+    return !!(m && m.classList.contains('open'));
+  }
+  function lock() {
+    if (locked) return;
+    locked = true;
+    savedY = window.scrollY || window.pageYOffset || 0;
+    savedX = window.scrollX || window.pageXOffset || 0;
+    document.documentElement.style.setProperty('--v520-lesson-body-top', (-savedY) + 'px');
+    document.documentElement.classList.add('v520-lesson-scroll-locked');
+    document.body.classList.add('v520-lesson-scroll-locked');
+    var dialog = lessonModal() && lessonModal().querySelector('.v340LearnDialog');
+    if (dialog) dialog.scrollTop = 0;
+  }
+  function unlock() {
+    if (!locked) return;
+    locked = false;
+    document.documentElement.classList.remove('v520-lesson-scroll-locked');
+    document.body.classList.remove('v520-lesson-scroll-locked');
+    document.documentElement.style.removeProperty('--v520-lesson-body-top');
+    window.scrollTo(savedX, savedY);
+  }
+  function sync() { if (isOpen()) lock(); else unlock(); }
+  function queueSync() {
+    if (rafQueued) return;
+    rafQueued = true;
+    requestAnimationFrame(function () { rafQueued = false; sync(); });
+  }
+  function start() {
+    // 동적으로 생성되는 세 학년 학습자료 팝업의 첫 열림도 추적합니다.
+    var observer = new MutationObserver(queueSync);
+    observer.observe(document.body, {
+      childList: true, subtree: true,
+      attributes: true, attributeFilter: ['class', 'aria-hidden']
+    });
+    document.addEventListener('click', function(e) {
+      if (e.target.closest && e.target.closest('#learn .v129-grade-card-row, #v340LearnModal')) {
+        queueSync();
+      }
+    }, true);
+    // 팝업 바깥의 터치로 브라우저 기본 스크롤이 배경으로 전파되지 않도록 제한
+    document.addEventListener('touchmove', function(e) {
+      if (!locked) return;
+      var target = e.target && (e.target.nodeType === 1 ? e.target : e.target.parentElement);
+      if (!target || !target.closest || !target.closest('#v340LearnModal .v340LearnDialog')) {
+        if (e.cancelable) e.preventDefault();
+      }
+    }, {passive:false, capture:true});
+    window.addEventListener('pageshow', queueSync);
+    queueSync();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once:true});
+  else start();
+})();
+</script>
 </body></html>
