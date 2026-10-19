@@ -988,6 +988,46 @@ document.addEventListener('DOMContentLoaded',function(){
   #v455MoreModal .v512StoryPageNums{gap:3px!important;}
 }
 </style>
+<style id="tax-v525-popup-scroll-style">
+
+/* V525: Only learning-material detail overlays in mobile mode.
+   No edits to other popups, navigation, desktop layout, quiz, or footer. */
+@media (max-width:900px) {
+  html.tax-v525-popup-locked {
+    overflow: hidden !important;
+    overscroll-behavior-y: none !important;
+  }
+  body.tax-v525-popup-locked {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: var(--tax-v525-offset, 0px) !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+  #v340LearnModal.open,
+  #v351LearnModal.open {
+    position: fixed !important;
+    inset: 0 !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    touch-action: auto !important;
+  }
+  #v340LearnModal.open .v340LearnDialog,
+  #v351LearnModal.open .v351Dialog {
+    max-height: calc(100vh - 24px) !important;
+    max-height: calc(100dvh - 24px) !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+  }
+}
+
+</style>
 </head>
 <body><div class="shell">
 <header><div class="brand v290Brand v310Brand">
@@ -5530,225 +5570,96 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
   else adjust();
 })();
 </script>
+<script id="tax-v525-popup-scroll-controller">
 
-
-<!-- V521: 학습자료 팝업의 실제 내용만 스크롤 / 모든 학년 / 터치·휠 백업 처리 -->
-<style id="v521-learn-scroll-style">
-  html.v521-learn-locked, body.v521-learn-locked {
-    overflow: hidden !important;
-    overscroll-behavior: none !important;
-  }
-  body.v521-learn-locked {
-    position: fixed !important;
-    top: var(--v521-body-top, 0px) !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100% !important;
-    touch-action: none !important;
-  }
-  .v521-learn-modal-active {
-    position: fixed !important;
-    inset: 0 !important;
-    overflow: hidden !important;
-    overscroll-behavior: none !important;
-    touch-action: none !important;
-    z-index: 99999 !important;
-  }
-  .v521-learn-modal-active .v521-learn-scroller {
-    box-sizing: border-box !important;
-    min-height: 0 !important;
-    max-height: calc(100vh - 24px) !important;
-    max-height: calc(100dvh - 24px) !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    overscroll-behavior: contain !important;
-    -webkit-overflow-scrolling: touch !important;
-    touch-action: pan-y !important;
-  }
-</style>
-<script id="v521-learn-scroll-script">
+/* V525: minimal scroll isolation for the existing two learning-material dialogs.
+   Observe their existing open/close lifecycle; do not replace their click handlers. */
 (function(){
   'use strict';
-  var active=null, scroller=null, touch=null, scheduled=false;
-  var scrollX=0, scrollY=0, previousInline=null, activePlaceholder=null;
-  var scrollProps=null, modalProps=null;
-  var selectors = [
-    '#v340LearnModal', '#v351LearnModal', '.v340LearnModal', '.v351LearnModal',
-    '[id*="LearnModal"]', '[class*="LearnModal"]', '.v153LessonModal'
-  ];
-  function visible(el){
-    if(!el || !el.isConnected || el.getAttribute('aria-hidden')==='true')return false;
-    var c=getComputedStyle(el);
-    return c.display!=='none' && c.visibility!=='hidden' &&
-      c.opacity!=='0' && el.getClientRects().length>0;
-  }
-  function isLesson(el){
-    return !!(el && (el.matches('#v340LearnModal, #v351LearnModal, .v153LessonModal') ||
-      el.querySelector('.v340LearnDialog,.v340LearnContent,.v153LessonNav,.v153ImageLesson,.v351Close')));
-  }
-  function findOpenModal(){
-    var list=document.querySelectorAll(selectors.join(','));
-    for(var i=0;i<list.length;i++){
-      var m=list[i];
-      if(isLesson(m) && visible(m) &&
-          (m.classList.contains('open') || m.classList.contains('show') ||
-           m.classList.contains('active') || m.getAttribute('aria-modal')==='true')) return m;
+  var ids=['v340LearnModal','v351LearnModal'];
+  var observing=new WeakSet(), active=null, originX=0, originY=0, priorOverflow='';
+  var touchY=null;
+  function isOpen(m){return !!(m&&m.classList.contains('open')&&m.getAttribute('aria-hidden')!=='true');}
+  function dialog(m){return m&&m.querySelector('.v340LearnDialog,.v351Dialog');}
+  function update(){
+    var next=null;
+    for(var i=0;i<ids.length;i++){
+      var m=document.getElementById(ids[i]);
+      if(m){watch(m);if(isOpen(m))next=m;}
     }
-    // Older high/middle popups may use a different ID: find the fixed overlay
-    // surrounding lesson navigation, not the inline content of the learning tab.
-    var lessonNavs=document.querySelectorAll('.v153LessonNav,.v153ImageLesson,.v351Close');
-    for(var j=0;j<lessonNavs.length;j++){
-      var n=lessonNavs[j], p=n;
-      for(var k=0;k<7 && p;k++,p=p.parentElement){
-        if(!visible(p))break;
-        if(p===document.body || p.id==='learn')break;
-        if(getComputedStyle(p).position==='fixed' && p.contains(n))return p;
-      }
-    }
-    return null;
+    if(next===active)return;
+    if(active)release();
+    if(next)acquire(next);
   }
-  function pickScroller(modal){
-    // Keep the scrolling inside the dialog; never select the page or backdrop.
-    var options=modal.querySelectorAll('.v340LearnDialog,.v351LearnDialog,.v351Dialog,[role="dialog"],.v153LessonDialog,.v340LearnContent');
-    for(var i=0;i<options.length;i++){
-      if(options[i]!==modal && visible(options[i]) && options[i].getBoundingClientRect().width>0)
-        return options[i];
-    }
-    return modal.firstElementChild || modal;
+  function acquire(m){
+    active=m;
+    originX=window.scrollX||0;originY=window.scrollY||0;
+    priorOverflow=document.body.style.overflow;
+    document.documentElement.style.setProperty('--tax-v525-offset',(-originY)+'px');
+    document.documentElement.classList.add('tax-v525-popup-locked');
+    document.body.classList.add('tax-v525-popup-locked');
+    document.body.style.overflow='hidden';
+    touchY=null;
+    var d=dialog(m);if(d)d.scrollTop=0;
   }
-  function freeze(modal){
-    if(active===modal)return;
-    thaw();
-    active=modal;
-    scroller=pickScroller(modal);
-    scrollX=window.scrollX || window.pageXOffset || 0;
-    scrollY=window.scrollY || window.pageYOffset || 0;
-    scrollProps=null;modalProps={};
-    ['position','inset','overflow','overscroll-behavior','touch-action','z-index'].forEach(function(k){
-      modalProps[k]=[modal.style.getPropertyValue(k),modal.style.getPropertyPriority(k)];
-    });
-    previousInline={
-      position:document.body.style.position,top:document.body.style.top,
-      left:document.body.style.left,right:document.body.style.right,
-      width:document.body.style.width,overflow:document.body.style.overflow,
-      touchAction:document.body.style.touchAction
-    };
-    // A fixed popup nested in a transformed menu can scroll the page instead.
-    // Move only the open popup to the root; restore to its original place on close.
-    if(modal.parentElement!==document.body){
-      activePlaceholder=document.createComment('v521-lesson-popup-original-position');
-      modal.parentNode.insertBefore(activePlaceholder,modal);
-      document.body.appendChild(modal);
-    }
-    document.documentElement.style.setProperty('--v521-body-top',(-scrollY)+'px');
-    document.documentElement.classList.add('v521-learn-locked');
-    document.body.classList.add('v521-learn-locked');
-    modal.classList.add('v521-learn-modal-active');
-    var ms={position:'fixed',inset:'0px',overflow:'hidden','overscroll-behavior':'none','touch-action':'none','z-index':'99999'};
-    Object.keys(ms).forEach(function(k){modal.style.setProperty(k,ms[k],'important');});
-    if(scroller && scroller!==modal){
-      scrollProps={};
-      var ss={'max-height':'calc(100dvh - 24px)','min-height':'0px',
-        'overflow-y':'auto','overflow-x':'hidden','overscroll-behavior':'contain',
-        '-webkit-overflow-scrolling':'touch','touch-action':'pan-y'};
-      Object.keys(ss).forEach(function(k){
-        scrollProps[k]=[scroller.style.getPropertyValue(k),scroller.style.getPropertyPriority(k)];
-        scroller.style.setProperty(k,ss[k],'important');
-      });
-      scroller.classList.add('v521-learn-scroller');
-      scroller.scrollTop=0;
-    }
-  }
-  function thaw(){
+  function release(){
     if(!active)return;
-    var m=active, b=previousInline;
-    active=null;
-    if(scroller){
-      scroller.classList.remove('v521-learn-scroller');
-      if(scrollProps)Object.keys(scrollProps).forEach(function(k){
-        var b=scrollProps[k];if(b[0])scroller.style.setProperty(k,b[0],b[1]);
-        else scroller.style.removeProperty(k);
-      });
-    }
-    scroller=null;scrollProps=null;touch=null;
-    m.classList.remove('v521-learn-modal-active');
-    if(modalProps)Object.keys(modalProps).forEach(function(k){
-      var b=modalProps[k];if(b[0])m.style.setProperty(k,b[0],b[1]);
-      else m.style.removeProperty(k);
-    });
-    modalProps=null;
-    if(activePlaceholder && activePlaceholder.parentNode){
-      activePlaceholder.parentNode.replaceChild(m,activePlaceholder);
-    }
-    activePlaceholder=null;
-    document.documentElement.classList.remove('v521-learn-locked');
-    document.body.classList.remove('v521-learn-locked');
-    document.documentElement.style.removeProperty('--v521-body-top');
-    if(b){
-      document.body.style.position=b.position;
-      document.body.style.top=b.top;
-      document.body.style.left=b.left;
-      document.body.style.right=b.right;
-      document.body.style.width=b.width;
-      document.body.style.overflow=b.overflow;
-      document.body.style.touchAction=b.touchAction;
-    }
-    previousInline=null;
-    window.scrollTo(scrollX,scrollY);
+    active=null;touchY=null;
+    document.body.classList.remove('tax-v525-popup-locked');
+    document.documentElement.classList.remove('tax-v525-popup-locked');
+    document.documentElement.style.removeProperty('--tax-v525-offset');
+    document.body.style.overflow=priorOverflow;
+    window.scrollTo(originX,originY);
   }
-  function sync(){
-    var modal=findOpenModal();
-    if(modal){if(active!==modal)freeze(modal);}
-    else thaw();
+  function watch(m){
+    if(observing.has(m))return;
+    observing.add(m);
+    var mo=new MutationObserver(update);
+    mo.observe(m,{attributes:true,attributeFilter:['class','aria-hidden']});
   }
-  function queue(){
-    if(scheduled)return;
-    scheduled=true;
-    requestAnimationFrame(function(){scheduled=false;sync();});
-  }
-  function inside(e){
-    return !!(active && e.target && (active===e.target || active.contains(e.target)));
-  }
-  function start(){
-    new MutationObserver(queue).observe(document.body,{
-      childList:true,subtree:true,attributes:true,
-      attributeFilter:['class','style','aria-hidden','aria-modal']
-    });
-    document.addEventListener('click',queue,true);
-    window.addEventListener('resize',queue,{passive:true});
-    document.addEventListener('touchstart',function(e){
-      if(!active || e.touches.length!==1)return;
-      var t=e.touches[0];
-      touch={x:t.clientX,y:t.clientY,vertical:false,inside:inside(e)};
-    },{capture:true,passive:true});
-    document.addEventListener('touchmove',function(e){
-      if(!active || !touch || e.touches.length!==1)return;
-      var t=e.touches[0],dx=t.clientX-touch.x,dy=t.clientY-touch.y;
-      if(!touch.inside){if(e.cancelable)e.preventDefault();return;}
-      if(!touch.vertical && Math.abs(dx)>Math.abs(dy)*1.1)return;
-      if(Math.abs(dy)>=1){
-        touch.vertical=true;
-        if(scroller && scroller.scrollHeight>scroller.clientHeight+1){
-          scroller.scrollTop-=dy;
+  function init(){
+    update();
+    // The original low-grade popup is created on demand and appended to body.
+    new MutationObserver(function(changes){
+      for(var i=0;i<changes.length;i++){
+        for(var j=0;j<changes[i].addedNodes.length;j++){
+          var n=changes[i].addedNodes[j];
+          if(n.nodeType===1 && ids.indexOf(n.id)!==-1){update();return;}
         }
-        // Prevent gestures leaking through the popup to the document.
-        if(e.cancelable)e.preventDefault();
       }
-      touch.x=t.clientX;touch.y=t.clientY;
-    },{capture:true,passive:false});
-    document.addEventListener('touchend',function(){touch=null;},{capture:true,passive:true});
-    document.addEventListener('touchcancel',function(){touch=null;},{capture:true,passive:true});
-    document.addEventListener('wheel',function(e){
-      if(!active)return;
-      if(inside(e) && scroller && scroller.scrollHeight>scroller.clientHeight+1){
-        scroller.scrollTop+=e.deltaY;
-      }
-      if(e.cancelable)e.preventDefault();
-    },{capture:true,passive:false});
-    queue();
+    }).observe(document.body,{childList:true});
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
-  else start();
+  document.addEventListener('touchstart',function(e){
+    if(!active||!e.touches||e.touches.length!==1)return;
+    touchY=e.touches[0].clientY;
+  },{passive:true,capture:true});
+  document.addEventListener('touchmove',function(e){
+    if(!active || !e.cancelable)return;
+    var d=dialog(active);
+    if(!d || !e.touches || e.touches.length!==1 || !d.contains(e.target)){
+      e.preventDefault();return;
+    }
+    var y=e.touches[0].clientY;
+    var dy=y-(touchY===null?y:touchY);
+    touchY=y;
+    var max=Math.max(0,d.scrollHeight-d.clientHeight);
+    // Short cards do not have anything to scroll: discard swipe rather than
+    // allowing it to scroll/rubber-band the page behind the popup.
+    if(max<=1 || (dy>0 && d.scrollTop<=0) || (dy<0 && d.scrollTop>=max-1)){
+      e.preventDefault();
+    }
+  },{passive:false,capture:true});
+  document.addEventListener('touchend',function(){touchY=null;},{passive:true,capture:true});
+  document.addEventListener('touchcancel',function(){touchY=null;},{passive:true,capture:true});
+  document.addEventListener('wheel',function(e){
+    if(!active||!e.cancelable)return;
+    var d=dialog(active);
+    if(!d||!d.contains(e.target))e.preventDefault();
+  },{passive:false,capture:true});
+  window.addEventListener('pagehide',function(){if(active)release();});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+  else init();
 })();
+
 </script>
 </body></html>
