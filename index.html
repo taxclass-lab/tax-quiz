@@ -1023,7 +1023,9 @@ document.addEventListener('DOMContentLoaded',function(){
     overflow-y: auto !important;
     overscroll-behavior-y: contain !important;
     -webkit-overflow-scrolling: touch !important;
-    touch-action: pan-y pinch-zoom !important;
+    /* Allow both-axis viewport panning after native pinch zoom.
+       Background scrolling remains isolated by the existing body lock. */
+    touch-action: auto !important;
   }
 }
 
