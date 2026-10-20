@@ -1023,7 +1023,7 @@ document.addEventListener('DOMContentLoaded',function(){
     overflow-y: auto !important;
     overscroll-behavior-y: contain !important;
     -webkit-overflow-scrolling: touch !important;
-    touch-action: pan-y !important;
+    touch-action: pan-y pinch-zoom !important;
   }
 }
 
@@ -5572,14 +5572,14 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
 </script>
 <script id="tax-v525-popup-scroll-controller">
 
-/* V525: minimal scroll isolation for the existing two learning-material dialogs.
-   Observe their existing open/close lifecycle; do not replace their click handlers. */
+/* Learning-material scroll isolation: CSS owns our lock. Original dialog
+   handlers own inline overflow; never capture their already-locked value. */
 (function(){
   'use strict';
   var ids=['v340LearnModal','v351LearnModal'];
-  var observing=new WeakSet(), active=null, originX=0, originY=0, priorOverflow='';
+  var observing=new WeakSet(), active=null, originX=0, originY=0;
   var touchY=null;
-  function isOpen(m){return !!(m&&m.classList.contains('open')&&m.getAttribute('aria-hidden')!=='true');}
+  function isOpen(m){return !!(m&&m.isConnected&&m.classList.contains('open')&&m.getAttribute('aria-hidden')!=='true');}
   function dialog(m){return m&&m.querySelector('.v340LearnDialog,.v351Dialog');}
   function update(){
     var next=null;
@@ -5594,11 +5594,9 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
   function acquire(m){
     active=m;
     originX=window.scrollX||0;originY=window.scrollY||0;
-    priorOverflow=document.body.style.overflow;
     document.documentElement.style.setProperty('--tax-v525-offset',(-originY)+'px');
     document.documentElement.classList.add('tax-v525-popup-locked');
     document.body.classList.add('tax-v525-popup-locked');
-    document.body.style.overflow='hidden';
     touchY=null;
     var d=dialog(m);if(d)d.scrollTop=0;
   }
@@ -5608,7 +5606,6 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
     document.body.classList.remove('tax-v525-popup-locked');
     document.documentElement.classList.remove('tax-v525-popup-locked');
     document.documentElement.style.removeProperty('--tax-v525-offset');
-    document.body.style.overflow=priorOverflow;
     window.scrollTo(originX,originY);
   }
   function watch(m){
@@ -5621,6 +5618,7 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
     update();
     // The original low-grade popup is created on demand and appended to body.
     new MutationObserver(function(changes){
+      if(active&&!active.isConnected){update();return;}
       for(var i=0;i<changes.length;i++){
         for(var j=0;j<changes[i].addedNodes.length;j++){
           var n=changes[i].addedNodes[j];
@@ -5635,6 +5633,9 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
   },{passive:true,capture:true});
   document.addEventListener('touchmove',function(e){
     if(!active || !e.cancelable)return;
+    // Preserve native pinch zoom and panning of the magnified viewport.
+    if(e.touches&&e.touches.length>1){touchY=null;return;}
+    if(window.visualViewport&&window.visualViewport.scale>1.01)return;
     var d=dialog(active);
     if(!d || !e.touches || e.touches.length!==1 || !d.contains(e.target)){
       e.preventDefault();return;
@@ -5652,7 +5653,7 @@ body.v412-force-desktop.v514-touch-pc-mode #v412MobileReturn:focus-visible{
   document.addEventListener('touchend',function(){touchY=null;},{passive:true,capture:true});
   document.addEventListener('touchcancel',function(){touchY=null;},{passive:true,capture:true});
   document.addEventListener('wheel',function(e){
-    if(!active||!e.cancelable)return;
+    if(!active||!e.cancelable||e.ctrlKey)return;
     var d=dialog(active);
     if(!d||!d.contains(e.target))e.preventDefault();
   },{passive:false,capture:true});
